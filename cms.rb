@@ -1,5 +1,4 @@
 require "yaml"
-
 require "sinatra"
 require "sinatra/reloader"
 require "tilt/erubis"
@@ -44,6 +43,21 @@ def render_markdown(text)
   markdown.render(text)
 end
 
+def validate_filename(name)
+  if name.size == 0
+    return "A name is required."
+  elsif name.match(/\.(txt|md)$/)
+    name_only = name.gsub(/\.(txt|md)$/, '')
+    if name_only.match(/(\\|\/|:|\*|\?|"|<|>|\|)/)
+      return "File name can must contain /\:*?\"<>|"
+    else
+      return ""
+    end
+  else
+    return "Invalid/missing extension"
+  end
+end
+
 def load_file_content(path)
   content = File.read(path)
   case File.extname(path)
@@ -84,9 +98,11 @@ post "/create" do
   require_signed_in_user
 
   filename = params[:filename].to_s
-
-  if filename.size == 0
-    session[:message] = "A name is required."
+  
+  message = validate_filename(filename)
+  
+  unless message == ""
+    session[:message] = message
     status 422
     erb :new
   else

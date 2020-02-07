@@ -149,6 +149,24 @@ class CMSTest < Minitest::Test
     assert_includes last_response.body, "A name is required"
   end
 
+  def test_create_new_document_with_invalid_character
+    post "/create", {filename: "wr*??ngf\/le.txt"}, admin_session
+    assert_equal 422, last_response.status
+    assert_includes last_response.body, "File name can must contain /\:*?\"<>|"
+  end
+
+  def test_create_new_document_without_file_extension
+    post "/create", {filename: "noextension"}, admin_session
+    assert_equal 422, last_response.status
+    assert_includes last_response.body, "Invalid/missing extension"
+  end
+
+  def test_create_new_document_with_invalid_file_extension
+    post "/create", {filename: "wrong_extension.zip"}, admin_session
+    assert_equal 422, last_response.status
+    assert_includes last_response.body, "Invalid/missing extension"
+  end
+
   def test_deleting_document
     create_document("test.txt")
 
@@ -177,7 +195,7 @@ class CMSTest < Minitest::Test
   end
 
   def test_signin
-    post "/users/signin", username: "admin", password: "secret"
+    post "/users/signin", username: "admin", password: "301090"
     assert_equal 302, last_response.status
     assert_equal "Welcome!", session[:message]
     assert_equal "admin", session[:username]
@@ -189,7 +207,7 @@ class CMSTest < Minitest::Test
   def test_signin_with_bad_credentials
     post "/users/signin", username: "guest", password: "shhhh"
     assert_equal 422, last_response.status
-    assert_equal nil, session[:username]
+    assert_nil session[:username]
     assert_includes last_response.body, "Invalid credentials"
   end
 
@@ -200,7 +218,7 @@ class CMSTest < Minitest::Test
     post "/users/signout"
     get last_response["Location"]
 
-    assert_equal nil, session[:username]
+    assert_nil session[:username]
     assert_includes last_response.body, "You have been signed out"
     assert_includes last_response.body, "Sign In"
   end
