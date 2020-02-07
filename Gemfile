@@ -4,5 +4,7 @@ gem "sinatra"
 gem "sinatra-contrib"
 gem "erubis"
 gem "bcrypt"
+gem "redcarpet"
 
 gem "minitest"
+gem "rack-test"
