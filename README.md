@@ -15,6 +15,9 @@ A simple file-based content management system. Allows logged in users to create/
 ## Added features (*in progress*)
 
 * Validate that document names contain an extension that the application supports.
+  * Filenames can not be created without an extension
+  * `.txt` and `.md` are only accepted file formats
+  * Filenames can not contain special characters `/\:*?<>|`
 * Add a "duplicate" button that creates a new document based on an old one.
 * Extend this project with a user signup form.
 * Add the ability to upload images to the CMS (which could be referenced within markdown files).
