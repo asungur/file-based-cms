@@ -137,6 +137,20 @@ get "/:filename/edit" do
   erb :edit
 end
 
+get "/:filename/duplicate" do
+  require_signed_in_user
+  
+  filename = params[:filename] + "_copy"
+  source_file_path = File.join(data_path, params[:filename])
+  file_path = File.join(data_path, filename)
+
+  File.write(file_path, source_file_path.read)
+  # FileUtils.cp params[:filename], filename
+  session[:message] = "#{params[:filename]} has been duplicated."
+  
+  redirect "/"
+end
+
 post "/:filename" do
   require_signed_in_user
 
