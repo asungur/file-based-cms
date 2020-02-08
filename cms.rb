@@ -27,6 +27,18 @@ def load_user_credentials
   YAML.load_file(credentials_path)
 end
 
+def add_user_credentials(username, password)
+  credentials_path = if ENV["RACK_ENV"] == "test"
+    File.expand_path("../test/users.yml", __FILE__)
+  else
+    File.expand_path("../users.yml", __FILE__)
+  end
+  bcrypt_password = BCrypt::Password.create(password).to_s
+  credentials = YAML.load_file(credentials_path).to_h
+  credentials[username] = bcrypt_password
+  File.write(credentials_path, credentials.to_yaml)
+end
+
 def valid_credentials?(username, password)
   credentials = load_user_credentials
 
@@ -191,6 +203,19 @@ post "/users/signin" do
     status 422
     erb :signin
   end
+end
+
+get "/users/signup" do
+  erb :signup
+end
+
+post "/users/signup" do
+  username = params[:username]
+  password = params[:password]
+  add_user_credentials(username,password)
+
+  session[:message] = "You have successfully registered" 
+  redirect "/"
 end
 
 post "/users/signout" do
