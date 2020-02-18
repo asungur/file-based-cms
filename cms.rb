@@ -8,6 +8,7 @@ require "bcrypt"
 configure do
   enable :sessions
   set :session_secret, 'super secret'
+   set :erb, escape_html: true
 end
 
 def data_path
@@ -17,6 +18,14 @@ def data_path
     File.expand_path("../data", __FILE__)
   end
 end
+
+def image_path
+  if ENV["RACK_ENV"] == "test"
+    File.expand_path("../test/images", __FILE__)
+  else
+    File.expand_path("../images", __FILE__)
+  end
+end 
 
 def load_user_credentials
   credentials_path = if ENV["RACK_ENV"] == "test"
@@ -70,6 +79,21 @@ def validate_filename(name)
   end
 end
 
+def validate_imagename(name)
+  if name.size == 0
+    return "A name is required."
+  elsif name.match(/\.(jpg|gif)$/)
+    name_only = name.gsub(/\.(jpg|gif)$/, '')
+    if name_only.match(/(\\|\/|:|\*|\?|"|<|>|\|)/)
+      return "Image name can must contain /\:*?\"<>|"
+    else
+      return ""
+    end
+  else
+    return "Invalid/missing extension"
+  end
+end
+
 def load_file_content(path)
   content = File.read(path)
   case File.extname(path)
@@ -93,10 +117,10 @@ def require_signed_in_user
 end
 
 get "/" do
-  pattern = File.join(data_path, "*")
-  @files = Dir.glob(pattern).map do |path|
-    File.basename(path)
-  end
+  file_pattern = File.join(data_path, "*")
+  image_pattern = File.join(image_path, "*")
+  @files = Dir.glob(file_pattern).map { |path| File.basename(path) }
+  @images = Dir.glob(image_pattern).map { |path| File.basename(path) }
   erb :index
 end
 
@@ -127,6 +151,11 @@ post "/create" do
   end
 end
 
+get "/upload" do
+  require_signed_in_user
+  erb :upload
+end
+
 get "/:filename" do
   file_path = File.join(data_path, params[:filename])
 
@@ -147,6 +176,28 @@ get "/:filename/edit" do
   @content = File.read(file_path)
 
   erb :edit
+end
+
+post "/upload" do
+  require_signed_in_user
+
+  imagename = params[:file][:filename].to_s
+
+  message = validate_imagename(imagename)
+
+  unless message == ""
+    session[:message] = message
+    status 422
+    erb :upload
+  else
+    file_path = File.join(image_path, imagename)
+    tempfile = params[:file][:tempfile]
+
+    File.open(file_path, 'wb') { |file| file.write(tempfile.read) }
+    session[:message] = "#{imagename} has been uploaded."
+
+    redirect "/"
+  end
 end
 
 post "/:filename/duplicate" do
@@ -207,6 +258,10 @@ end
 
 get "/users/signup" do
   erb :signup
+end
+
+get "/images/:image" do
+  erb params[:image]
 end
 
 post "/users/signup" do

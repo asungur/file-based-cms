@@ -222,4 +222,10 @@ class CMSTest < Minitest::Test
     assert_includes last_response.body, "You have been signed out"
     assert_includes last_response.body, "Sign In"
   end
+
+  def test_signup
+    post "/users/signup", username: "odin", password: "12345"
+    assert_equal 302, last_response.status
+    assert_equal "You have successfully registered", session[:message]
+  end
 end
