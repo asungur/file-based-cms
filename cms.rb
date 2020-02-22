@@ -8,7 +8,7 @@ require "bcrypt"
 configure do
   enable :sessions
   set :session_secret, 'super secret'
-   set :erb, escape_html: true
+  set :erb, escape_html: true
 end
 
 def data_path
@@ -79,27 +79,15 @@ def validate_filename(name)
   end
 end
 
-def validate_imagename(name)
-  if name.size == 0
-    return "A name is required."
-  elsif name.match(/\.(jpg|gif)$/)
-    name_only = name.gsub(/\.(jpg|gif)$/, '')
-    if name_only.match(/(\\|\/|:|\*|\?|"|<|>|\|)/)
-      return "Image name can must contain /\:*?\"<>|"
-    else
-      return ""
-    end
-  else
-    return "Invalid/missing extension"
-  end
-end
-
 def load_file_content(path)
   content = File.read(path)
   case File.extname(path)
   when ".txt"
     headers["Content-Type"] = "text/plain"
     content
+  when ".jpg"
+    headers["Content-Type"] = "image/jpeg"
+    contents
   when ".md"
     erb render_markdown(content)
   end
@@ -116,11 +104,40 @@ def require_signed_in_user
   end
 end
 
+def create_document(name, content = "")
+  File.open(File.join(data_path, name), "w") do |file|
+    file.write(content)
+  end
+end
+
+def history_files(path, history_path = "history")
+  filename = File.basename(path, ".*")
+  extension = File.extname(path)
+  directory = File.dirname(path)
+
+  paths = Dir.glob(File.join(directory, history_path, "#{filename}_v*#{extension}"))
+  paths.map { |path| File.basename(path) }.sort
+end
+
+def next_version_file_path(path, history_path = "history")
+  filename = File.basename(path, ".*")
+  extension = File.extname(path)
+  directory = File.dirname(path)
+
+  versions = Dir.glob(File.join(directory, history_path, "#{filename}_v*#{extension}"))
+  next_version_num = if versions.empty?
+                       "000"
+                     else
+                       latest_version = File.basename(versions.max, ".*")
+                       sprintf("%03d", latest_version[-3..-1].to_i + 1)
+                     end
+  name = File.join(history_path, filename + "_v" + next_version_num + extension)
+  File.join(directory, name)
+end
+
 get "/" do
   file_pattern = File.join(data_path, "*")
-  image_pattern = File.join(image_path, "*")
   @files = Dir.glob(file_pattern).map { |path| File.basename(path) }
-  @images = Dir.glob(image_pattern).map { |path| File.basename(path) }
   erb :index
 end
 
@@ -128,114 +145,6 @@ get "/new" do
   require_signed_in_user
 
   erb :new
-end
-
-post "/create" do
-  require_signed_in_user
-
-  filename = params[:filename].to_s
-  
-  message = validate_filename(filename)
-  
-  unless message == ""
-    session[:message] = message
-    status 422
-    erb :new
-  else
-    file_path = File.join(data_path, filename)
-
-    File.write(file_path, "")
-    session[:message] = "#{params[:filename]} has been created."
-
-    redirect "/"
-  end
-end
-
-get "/upload" do
-  require_signed_in_user
-  erb :upload
-end
-
-get "/:filename" do
-  file_path = File.join(data_path, params[:filename])
-
-  if File.exist?(file_path)
-    load_file_content(file_path)
-  else
-    session[:message] = "#{params[:filename]} does not exist."
-    redirect "/"
-  end
-end
-
-get "/:filename/edit" do
-  require_signed_in_user
-
-  file_path = File.join(data_path, params[:filename])
-
-  @filename = params[:filename]
-  @content = File.read(file_path)
-
-  erb :edit
-end
-
-post "/upload" do
-  require_signed_in_user
-
-  imagename = params[:file][:filename].to_s
-
-  message = validate_imagename(imagename)
-
-  unless message == ""
-    session[:message] = message
-    status 422
-    erb :upload
-  else
-    file_path = File.join(image_path, imagename)
-    tempfile = params[:file][:tempfile]
-
-    File.open(file_path, 'wb') { |file| file.write(tempfile.read) }
-    session[:message] = "#{imagename} has been uploaded."
-
-    redirect "/"
-  end
-end
-
-post "/:filename/duplicate" do
-  require_signed_in_user
-
-  filename = params[:filename]
-  filename = filename.split(".").insert(1, "_copy.").join('')
-
-  file_path = File.join(data_path, filename)
-  source_path = File.join(data_path, params[:filename])
-  source_content =File.read(source_path)
-
-  File.write(file_path, source_content)
-  session[:message] = "#{params[:filename]} has been duplicated."
-
-  redirect "/"
-end
-
-post "/:filename" do
-  require_signed_in_user
-
-  file_path = File.join(data_path, params[:filename])
-
-  File.write(file_path, params[:content])
-
-  session[:message] = "#{params[:filename]} has been updated."
-  redirect "/"
-end
-
-post "/:filename/delete" do
-  require_signed_in_user
-
-  file_path = File.join(data_path, params[:filename])
-
-  File.delete(file_path)
-
-  session[:message] = "#{params[:filename]} has been deleted."
-  redirect "/"
 end
 
 get "/users/signin" do
@@ -260,21 +169,154 @@ get "/users/signup" do
   erb :signup
 end
 
-get "/images/:image" do
-  erb params[:image]
-end
-
-post "/users/signup" do
-  username = params[:username]
-  password = params[:password]
-  add_user_credentials(username,password)
-
-  session[:message] = "You have successfully registered" 
-  redirect "/"
-end
-
 post "/users/signout" do
   session.delete(:username)
   session[:message] = "You have been signed out."
+  redirect "/"
+end
+
+
+get "/:filename" do
+  file_path = File.join(data_path, File.basename(params[:filename]))
+
+  if File.exist?(file_path)
+    load_file_content(file_path)
+  else
+    session[:message] = "#{params[:filename]} does not exist."
+    redirect "/"
+  end
+end
+
+get "/:filename/edit" do
+  require_signed_in_user
+
+  file_path = File.join(data_path, File.basename(params[:filename]))
+
+  if File.extname(file_path) == ".jpg"
+    session[:message] = "You can not edit images"
+    redirect "/"
+  end
+  @filename = params[:filename]
+  @content = File.read(file_path)
+  @history_files = history_files(file_path)
+
+  erb :edit
+end
+
+post "/new" do
+  require_signed_in_user
+
+  filename = params[:filename]
+  
+  message = validate_filename(filename)
+  
+  unless message == ""
+    session[:message] = message
+    status 422
+    erb :new
+  else
+    file_path = File.join(data_path, filename)
+
+    File.write(file_path, "")
+    session[:message] = "#{params[:filename]} has been created."
+
+    redirect "/"
+  end
+end
+
+post "/uploadimage" do
+  require_signed_in_user
+
+  if params[:image]
+    filename = params[:image][:filename]
+    image_data = params[:image][:tempfile]
+  else
+    session[:message] = "Please upload an image"
+    status 422
+    halt erb :new
+  end
+
+  unless File.extname(filename) == ".jpg"
+    session[:message] = "unsupported format (supports: .jpg)"
+    status 422
+    erb :new
+  else
+    File.open(File.join(data_path, filename), "wb") do |file|
+      file.write(image_data.read)
+    end
+    session[:message] = "#{filename} has been uploaded."
+    redirect "/"
+  end
+end
+
+post "/:filename" do
+  require_signed_in_user
+
+  file_path = File.join(data_path, File.basename(params[:filename]))
+  new_content = params[:file_content]
+  base_content = File.read(file_path)
+  
+  if new_content == base_content
+    session[:message] = "No changes were made."
+    redirect "/"
+  else
+    File.write(file_path, new_content)
+    File.write(new_version_path(file_path), base_content)
+    session[:message] = "#{params[:filename]} has been updated."
+    redirect "/"
+  end
+end
+
+post "/:filename/duplicate" do
+  require_signed_in_user
+
+  filename = File.basename(params[:filename])
+  file_path = File.join(data_path, filename)
+
+  if File.extname(file_path) == ".jpg"
+    session[:message] = "Image files can not be duplicated"
+    redirect "/"
+  end
+
+  content =File.read(file_path)
+  new_filename = filename + "_copy"
+
+  create_document(new_filename, content)
+  session[:message] = "#{new_filename} has been created."
+
+  redirect "/"
+end
+
+post "/:filename/delete" do
+  require_signed_in_user
+
+  file_path = File.join(data_path, File.basename(params[:filename]))
+
+  File.delete(file_path)
+
+  session[:message] = "#{params[:filename]} has been deleted."
+  redirect "/"
+end
+
+get "/:filename/history" do
+  require_signed_in_user
+
+  @file_name = File.basename(params[:history_file])
+  file_path = File.join(data_path, "history", @file_name)
+  load_file_content(file_path)
+end
+
+post "/:filename/history/:history_file/restore" do
+  require_signed_in_user
+
+  base_path = File.join(data_path, File.basename(params[:filename]))
+  history_path = File.join(data_path, "history", File.basename(params[:history_file]))
+  base_content = File.read(base_path)
+  history_content = File.read(history_path)
+
+  File.write(next_version_file_path(base_path), base_content)
+  File.write(base_path, history_content)
+  File.delete(history_path)
+  session[:message] = "#{params[:history_file]} has been restored to #{params[:filename]}."
   redirect "/"
 end
