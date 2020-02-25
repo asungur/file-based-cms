@@ -137,7 +137,14 @@ end
 
 get "/" do
   file_pattern = File.join(data_path, "*")
-  @files = Dir.glob(file_pattern).map { |path| File.basename(path) }
+  @files = Dir.glob(file_pattern).select do |path|
+    File.file?(path)
+  end
+
+  @files.map! do |path|
+    File.basename(path)
+  end
+
   erb :index
 end
 
@@ -195,9 +202,15 @@ get "/:filename/edit" do
     session[:message] = "You can not edit images"
     redirect "/"
   end
-  @filename = params[:filename]
-  @content = File.read(file_path)
-  @history_files = history_files(file_path)
+  
+  if File.file?(file_path)
+    @filename = params[:filename]
+    @content = File.read(file_path)
+    @history_files = history_files(file_path)
+  else
+    session[:message] = "#{params[filename]} does not exist."
+    redirect "/"
+  end
 
   erb :edit
 end
@@ -206,7 +219,6 @@ post "/new" do
   require_signed_in_user
 
   filename = params[:filename]
-  
   message = validate_filename(filename)
   
   unless message == ""
@@ -214,11 +226,8 @@ post "/new" do
     status 422
     erb :new
   else
-    file_path = File.join(data_path, filename)
-
-    File.write(file_path, "")
-    session[:message] = "#{params[:filename]} has been created."
-
+    create_document(filename)
+    session[:message] = "#{filename} has been created."
     redirect "/"
   end
 end
@@ -252,10 +261,13 @@ post "/:filename" do
   require_signed_in_user
 
   file_path = File.join(data_path, File.basename(params[:filename]))
-  new_content = params[:file_content]
+  new_content = params[:content]
   base_content = File.read(file_path)
   
-  if new_content == base_content
+  if !File.file?(file_path)
+    session[:message] = "#{params[:filename]} does not exist."
+    redirect "/"
+  elsif new_content == base_content
     session[:message] = "No changes were made."
     redirect "/"
   else
@@ -277,13 +289,13 @@ post "/:filename/duplicate" do
     redirect "/"
   end
 
-  content =File.read(file_path)
+  content = File.read(file_path)
   new_filename = filename + "_copy"
 
   create_document(new_filename, content)
   session[:message] = "#{new_filename} has been created."
 
-  redirect "/"
+  redirect "/#{new_filename}/edit"
 end
 
 post "/:filename/delete" do
@@ -291,17 +303,31 @@ post "/:filename/delete" do
 
   file_path = File.join(data_path, File.basename(params[:filename]))
 
-  File.delete(file_path)
-
-  session[:message] = "#{params[:filename]} has been deleted."
-  redirect "/"
+  if !File.file?(file_path)
+    session[:message] = "#{params[:filename]} does not exist."
+    redirect "/"
+  elsif
+    File.delete(file_path)
+    session[:message] = "#{params[:filename]} has been deleted."
+    redirect "/"
+  end
 end
 
 get "/:filename/history" do
   require_signed_in_user
 
-  @file_name = File.basename(params[:history_file])
-  file_path = File.join(data_path, "history", @file_name)
+  @filename = File.basename(params[:filename])
+  file_path = File.join(data_path, @filename)
+  @history_files = history_files(file_path)
+
+  erb :history
+end
+
+get "/:filename/history/:history_file" do
+  require_signed_in_user
+
+  @filename = File.basename(params[:history_file])
+  file_path = File.join(data_path, "history", @filename)
   load_file_content(file_path)
 end
 
