@@ -87,7 +87,7 @@ def load_file_content(path)
     content
   when ".jpg"
     headers["Content-Type"] = "image/jpeg"
-    contents
+    content
   when ".md"
     erb render_markdown(content)
   end
@@ -175,7 +175,6 @@ post "/users/signout" do
   redirect "/"
 end
 
-
 get "/:filename" do
   file_path = File.join(data_path, File.basename(params[:filename]))
 
@@ -261,7 +260,7 @@ post "/:filename" do
     redirect "/"
   else
     File.write(file_path, new_content)
-    File.write(new_version_path(file_path), base_content)
+    File.write(next_version_file_path(file_path), base_content)
     session[:message] = "#{params[:filename]} has been updated."
     redirect "/"
   end

@@ -1,0 +1,15 @@
+<h3>History for <%= @filename %></h3>
+
+<ul>
+<% @history_files.each do |filename| %>
+  <li>
+    <form class="inline" action="history/<%= filename %>" >
+      <button type="submit">View</button>
+    </form>
+    <form class="inline" action="history/<%= filename %>/restore" method="post" onsubmit="return confirm('Are you sure?');">
+      <button type="submit">Restore</button>
+    </form>
+    <%= filename %>
+  </li>
+<% end %>
+</ul
