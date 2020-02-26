@@ -43,6 +43,11 @@ Clone the project and :
 * Stored user account credentials in an external file.
 * Hashed passwords via `BCrypt`
 
+## Further development
+
+* Delete history files upon file deletion.
+* Add user interface.
+
 ## Credits
 
 This project is *being* implemented on the base code from the File-based CMS project from Launch
