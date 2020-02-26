@@ -20,8 +20,8 @@ A simple file-based content management system. Allows logged in users to create/
   * Filenames can not contain special characters `/\:*?<>|`
 * ✅ Add a "duplicate" button that creates a new document based on an old one.
 * ✅ Extend this project with a user signup form.
-* 🕑 Add the ability to upload images to the CMS (which could be referenced within markdown files).
-* 🕑 Modify the CMS so that each version of a document is preserved as changes are made to it.
+* ✅ Add the ability to upload images to the CMS (which could be referenced within markdown files).
+* ✅ Modify the CMS so that each version of a document is preserved as changes are made to it.
 
 ## Running in your own machine
 
