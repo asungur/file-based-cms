@@ -176,6 +176,15 @@ get "/users/signup" do
   erb :signup
 end
 
+post "/users/signup" do
+  username = params[:username]
+  password = params[:password]
+  add_user_credentials(username,password)
+
+  session[:message] = "You have successfully registered" 
+  redirect "/"
+end
+
 post "/users/signout" do
   session.delete(:username)
   session[:message] = "You have been signed out."
@@ -202,15 +211,10 @@ get "/:filename/edit" do
     session[:message] = "You can not edit images"
     redirect "/"
   end
-  
-  if File.file?(file_path)
-    @filename = params[:filename]
-    @content = File.read(file_path)
-    @history_files = history_files(file_path)
-  else
-    session[:message] = "#{params[filename]} does not exist."
-    redirect "/"
-  end
+
+  @filename = params[:filename]
+  @content = File.read(file_path)
+  @history_files = history_files(file_path)
 
   erb :edit
 end
